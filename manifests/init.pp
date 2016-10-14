@@ -88,13 +88,20 @@ class teamspeak (
   }
 
   $parsed_mirror = inline_epp($mirror)
-  exec { 'download_teamspeak':
-    command => "wget -q ${parsed_mirror}",
-    path    => '/usr/bin',
-    cwd     => "${home}/downloads",
-    user    => $user,
-    group   => $group,
-    creates => "${home}/downloads/teamspeak3-server_linux-${arch}-${version}.tar.gz",
+
+
+
+
+  exec {'check_file_exists':
+    command => "wget --spider ${parsed_mirror}",
+    path    => ['/usr/bin','/bin'],
+    unless  => "ls ${home}/downloads/$output_file",
+    # before  => [
+    #   Notify { "file-location":
+    #     withpath => true,
+    #     name     => "$parsed_mirror",
+    #   }
+    # ],
     require => [
       File["${home}/downloads"],
       User[$user],
@@ -102,8 +109,20 @@ class teamspeak (
     ],
   }
 
+  exec { 'download_teamspeak':
+    command => "wget -q ${parsed_mirror} -O $output_file",
+    path    => '/usr/bin',
+    cwd     => "${home}/downloads",
+    user    => $user,
+    group   => $group,
+    creates => "${home}/downloads/$output_file",
+    require => [
+      Exec["check_file_exists"],
+    ],
+  }
+
   exec { 'unpack_teamspeak':
-    command     => "tar -xzf ${home}/downloads/teamspeak3-server_linux-${arch}-${version}.tar.gz -C /opt/teamspeak/downloads",
+    command     => "tar -xjf ${home}/downloads/$output_file -C /opt/teamspeak/downloads",
     path        => '/bin',
     user        => $user,
     refreshonly => true,
@@ -111,7 +130,7 @@ class teamspeak (
   }
 
   exec { 'move_teamspeak':
-    command     => "mv teamspeak3-server_linux-${arch}/* ${home}",
+    command     => "mv teamspeak3-server_linux_${arch}/* ${home}",
     cwd         => "${home}/downloads",
     path        => '/bin',
     user        => $user,
@@ -121,7 +140,7 @@ class teamspeak (
 
   file { 'delete_temp_teamspeak':
     ensure    => absent,
-    path      => "${home}/downloads/teamspeak3-server_linux-${arch}",
+    path      => "${home}/downloads/teamspeak3-server_linux_${arch}",
     subscribe => Exec['move_teamspeak'],
     recurse   => true,
     purge     => true,
